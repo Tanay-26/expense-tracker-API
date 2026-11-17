@@ -1,0 +1,126 @@
+### Expense Tracker API - end-to-end demo script
+### Works in IntelliJ IDEA / VS Code (REST Client extension). Run the requests top to bottom.
+
+@host = http://localhost:8080
+@email = riya@example.com
+
+### 1. Register (returns a JWT). 201 Created
+# @name register
+POST {{host}}/api/v1/auth/register
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "password": "sup3rsecret",
+  "fullName": "Riya Sharma"
+}
+
+### 2. Login (use this if the account already exists). 200 OK
+# @name login
+POST {{host}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "password": "sup3rsecret"
+}
+
+@token = {{login.response.body.token}}
+
+### 3. Anything without a token must fail. Expect 401 + ApiError JSON
+GET {{host}}/api/v1/expenses
+
+### 4. Set a monthly FOOD budget of 5000. 200 OK
+PUT {{host}}/api/v1/budgets
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "category": "FOOD",
+  "monthlyLimit": 5000.00
+}
+
+### 5. Create an expense well under budget -> event fires, no alert. 201 Created
+POST {{host}}/api/v1/expenses
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "amount": 450.00,
+  "category": "FOOD",
+  "description": "Groceries",
+  "spentAt": "2026-08-20"
+}
+
+### 6. Create a big expense that pushes FOOD past 80% -> WARNING alert appears in notifications
+POST {{host}}/api/v1/expenses
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "amount": 4000.00,
+  "category": "FOOD",
+  "description": "Party dinner",
+  "spentAt": "2026-08-21"
+}
+
+### 7. Push it over 100% -> EXCEEDED alert
+POST {{host}}/api/v1/expenses
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "amount": 1200.00,
+  "category": "FOOD",
+  "description": "Weekend takeout",
+  "spentAt": "2026-08-22"
+}
+
+### 8. THE MONEY SHOT: alerts created asynchronously by the Kafka consumers
+GET {{host}}/api/v1/notifications
+Authorization: Bearer {{token}}
+
+### 9. Unread badge count
+GET {{host}}/api/v1/notifications/unread-count
+Authorization: Bearer {{token}}
+
+### 10. Paginated + filtered list (index-backed query)
+GET {{host}}/api/v1/expenses?category=FOOD&from=2026-08-01&to=2026-08-31&page=0&size=10
+Authorization: Bearer {{token}}
+
+### 11. Monthly summary (single GROUP BY query)
+GET {{host}}/api/v1/expenses/summary?month=2026-08
+Authorization: Bearer {{token}}
+
+### 12. Update an expense
+PUT {{host}}/api/v1/expenses/1
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "amount": 500.00,
+  "category": "FOOD",
+  "description": "Groceries (corrected)",
+  "spentAt": "2026-08-20"
+}
+
+### 13. Delete an expense. 204 No Content
+DELETE {{host}}/api/v1/expenses/1
+Authorization: Bearer {{token}}
+
+### 14. Validation failure -> 400 with a details array
+POST {{host}}/api/v1/expenses
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "amount": -5,
+  "category": "FOOD",
+  "spentAt": "2099-01-01"
+}
+
+### 15. Latency proof: p95/p99 of every endpoint
+GET {{host}}/actuator/metrics/http.server.requests
+
+### 16. Health
+GET {{host}}/actuator/health

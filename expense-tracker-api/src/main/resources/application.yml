@@ -1,0 +1,59 @@
+spring:
+  application:
+    name: expense-tracker-api
+
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/expense_tracker}
+    username: ${DB_USERNAME:expense_user}
+    password: ${DB_PASSWORD:expense_pass}
+    hikari:
+      maximum-pool-size: 10        # 10 pooled connections; opening a TCP+auth handshake per request costs ~30ms
+      minimum-idle: 2
+      connection-timeout: 3000
+
+  jpa:
+    hibernate:
+      ddl-auto: validate           # Flyway owns the schema. Hibernate only verifies entities match it.
+    open-in-view: false            # Prevents lazy-loading inside the view layer = no hidden N+1 queries
+    properties:
+      hibernate:
+        jdbc:
+          batch_size: 25
+        order_inserts: true
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: expense-tracker-service
+      auto-offset-reset: earliest
+
+# ---- Application-specific settings (bound with @Value) ----
+app:
+  jwt:
+    secret: ${JWT_SECRET:RyX4ZHlQ34AT1+LRh8Z0ygMum6Pwg7pghqVbQ6+XHBG2TNN7OIKubgkL4N5SpZrZ}
+    expiration-minutes: ${JWT_EXPIRATION_MINUTES:60}
+  kafka:
+    topics:
+      expense-events: expense-events
+      notification-events: notification-events
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  metrics:
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true    # lets you prove the p95/p99 latency claim from /actuator/metrics
+
+logging:
+  level:
+    com.example.expensetracker: INFO
+    org.apache.kafka: WARN
+    org.hibernate.SQL: INFO           # set to DEBUG to watch the generated SQL
